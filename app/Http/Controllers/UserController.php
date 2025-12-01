@@ -59,7 +59,9 @@ class UserController extends Controller
             $user->phone = $request->input('phone');
             $user->gender = $request->input('gender');
             $user->user_role = $request->input('user_role');
-            $user->profile_picture = $request->file('profile_picture')->store('users_pictures', 'public');
+            if($request->hasFile('profile_picture')) {
+                $user->profile_picture = $request->file('profile_picture')->store('users_pictures', 'public');
+            }
             $user->save();
 
             return response()->json([
