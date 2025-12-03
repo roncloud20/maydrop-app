@@ -6,6 +6,7 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Validator;
 
 class UserController extends Controller
@@ -50,6 +51,7 @@ class UserController extends Controller
             // ]);
 
             // Using Eloquent ORM
+            $code = rand(100000,999999);
             $user = new User;
             $user->firstname = $request->input('firstname');
             $user->middlename = $request->input('middlename');
@@ -62,7 +64,15 @@ class UserController extends Controller
             if($request->hasFile('profile_picture')) {
                 $user->profile_picture = $request->file('profile_picture')->store('users_pictures', 'public');
             }
+            $user->verification_code = $code;
             $user->save();
+            Mail::send('emails.user-verification',[
+                'fullname' => $user->firstname . " " . $user->surname,
+                'code' => $code,
+                'url_link' => env('FRONTEND_URL') . "/verify?email=$user->email&code=$code",
+            ], function ($message) use ($user){
+                $message->to($user->email)->subject('Email Verification');
+            });
 
             return response()->json([
                 'user' => $user,
@@ -75,5 +85,44 @@ class UserController extends Controller
             ], 500);
         }
 
+    }
+
+    // Verification of new user
+    public function verify (Request $request) {
+        // Validate users entries
+        $validator = Validator::make($request->all(), [
+            'email' => 'required|exists:users,email',
+            'code' => 'required'
+        ]);
+
+        // Return an output base on user entries if errors occurs
+        if($validator->fails()) {
+            return response()->json([
+                'errors' => $validator->errors(),
+                'message' => 'Validation Failed',
+            ], 400);
+        }
+
+        try {
+            $user = User::where('email', $request->input('email'))->first();
+            if($user->verication_code === $request->input('code')) {
+                $user->update([
+                    'verication_code' => null,
+                    'email_verified_at' => now(),
+                ]);
+                return response()->json([
+                    'user' => $user,
+                    'message' => 'Verification Successful',
+                ], 200);
+            } else {
+                return response()->json([
+                    'message' => 'Verification Failed',
+                ], 406);
+            }
+        } catch (\Exception $errors) {
+            return response()->json([
+                'errors' => $errors,
+            ], 500);
+        }
     }
 }
