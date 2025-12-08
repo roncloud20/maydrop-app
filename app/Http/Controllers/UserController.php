@@ -65,7 +65,7 @@ class UserController extends Controller
                 $user->profile_picture = $request->file('profile_picture')->store('users_pictures', 'public');
             }
             $user->verification_code = $code;
-            $user->save();
+            
             Mail::send('emails.user-verification',[
                 'fullname' => $user->firstname . " " . $user->surname,
                 'code' => $code,
@@ -73,6 +73,8 @@ class UserController extends Controller
             ], function ($message) use ($user){
                 $message->to($user->email)->subject('Email Verification');
             });
+
+            $user->save();
 
             return response()->json([
                 'user' => $user,
@@ -105,11 +107,24 @@ class UserController extends Controller
 
         try {
             $user = User::where('email', $request->input('email'))->first();
-            if($user->verication_code === $request->input('code')) {
-                $user->update([
-                    'verication_code' => null,
+            if($user->verification_code === $request->input('code')) {
+                // $user->update([
+                //     'verification_code' => null,
+                //     'email_verified_at' => now(),
+                // ]);
+                DB::table('users')->where('email', $request->input('email'))->update([
+                    'verification_code' => null,
                     'email_verified_at' => now(),
+                    'updated_at' => now(),
                 ]);
+                
+                Mail::send('emails.email-verified',[
+                    'fullname' => $user->firstname . " " . $user->surname,
+                    'url_link' => env('FRONTEND_URL') . '/login',
+                    'role' => $user->user_role,
+                ], function ($message) use ($user){
+                    $message->to($user->email)->subject('Email Verified Successfully');
+                });
                 return response()->json([
                     'user' => $user,
                     'message' => 'Verification Successful',

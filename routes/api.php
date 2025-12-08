@@ -20,4 +20,4 @@ use Illuminate\Support\Facades\Route;
 // });
 
 Route::post('/register', [UserController::class, 'create']);
-Route::put('/verify', [UserController::class, 'verify']);
+Route::post('/verify', [UserController::class, 'verify']);
